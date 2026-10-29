@@ -21,6 +21,8 @@ Antes de mudar comportamento HTTP, conferir `docs/api.md` e atualizar o contrato
 | Validação | Zod 4 |
 | ORM / banco | Drizzle ORM + PostgreSQL 17 |
 | Senha | bcrypt (cost 10) |
+| Upload | multer (só na borda, `memoryStorage`) + sharp → disco |
+| E-mail | nodemailer; Mailpit (SMTP dev/teste) |
 | Testes | Vitest + Supertest contra o **banco de teste real** |
 
 O PRD menciona Vite e chama a camada de negócio de service; a implementação usa `tsx` no dev, `tsc` no build e use cases. Siga o código e o `package.json`.
@@ -59,6 +61,8 @@ src/
   errors/app-error.ts    # AppError + ErrorCode
   types/                 # AuthUser; Express.Request.user
   utils/                 # validate(), generateSessionToken()
+  storage/               # porta ImageStorage + implementação sharp/disco
+  mail/                  # porta Mailer + implementação nodemailer
 tests/                   # *.spec.ts por endpoint (integração HTTP)
 docs/                    # PRD, contrato da API, braindump
 drizzle/                 # migrations geradas
@@ -171,8 +175,34 @@ TDD: para comportamento novo/alterado, começar pelo spec HTTP.
 2. Spec de integração.
 3. Schema Zod → route → controller → use case → repositório (interface + Drizzle) → DTO.
 4. Não vazar senha/token hash. Não retornar e-mail de autores em posts/replies.
-5. Não adicionar logout, perfil, admin, soft delete, threads de replies ou likes em replies, salvo pedido explícito e atualização do contrato.
+5. Não adicionar logout, perfil (além do avatar), admin, soft delete, threads de replies ou likes em replies, salvo pedido explícito e atualização do contrato.
+
+## Upload de imagens (foto do post e avatar do usuário)
+
+Fluxo obrigatório: **Route (multer) → Controller → Use Case (recebe `Buffer`) → `ImageStorage` (sharp + disco) → Repository (salva o path)**.
+
+- **Multer só na borda**: usado apenas em `routes/` (ou middleware em `middlewares/`) com `memoryStorage()`, `limits.fileSize` e `fileFilter` de MIME (`image/jpeg`, `image/png`, `image/webp`). Nunca `diskStorage`. Multer/`Express.Multer.File` não pode aparecer em use cases, repositórios ou DTOs.
+- **Controller** valida o campo do arquivo (ausente → `VALIDATION_ERROR` 400) e passa `file.buffer` ao use case. Erros do multer (tamanho, tipo, campo inesperado) viram `AppError` 400 `VALIDATION_ERROR` no `errorHandler`.
+- **Use case** recebe `Buffer` (não `req`/`file`), aplica as regras (ownership, 404/403) e chama uma porta `ImageStorage` (interface em `src/storage/` ou similar, implementação `sharp-image-storage.ts`) injetada no construtor.
+- **Sharp** (somente na implementação de storage): valida que o buffer é imagem de verdade, redimensiona/normaliza (ex.: avatar quadrado pequeno, foto do post com largura máxima), converte para um formato único (ex.: webp), remove metadados e grava em disco com nome gerado (UUID). Nunca usar o nome original do cliente.
+- **Banco guarda só o path relativo** (ex.: `avatars/<uuid>.webp`, `posts/<uuid>.webp`), em colunas nullable (`users.avatarPath`, `posts.imagePath`). Nunca o binário nem path absoluto. Mudança de schema segue o fluxo do `db:generate`.
+- **Diretório**: configurado por env `UPLOADS_DIR` (default `uploads/`, no `.gitignore`); nos testes usar diretório temporário próprio (ex.: `uploads-test/`, também ignorado) e limpá-lo junto com `cleanDatabase`. Servir via `express.static` em `/uploads` ou expor URL montada no DTO (`avatarUrl`, `imageUrl`: `null` quando ausente) — nunca o path de disco.
+- Ao substituir ou remover imagem (e ao excluir post em cascade), apagar o arquivo antigo do disco; falha ao apagar arquivo não pode quebrar a requisição (logar).
+- Se a gravação em disco funcionar mas a persistência falhar, remover o arquivo órfão.
+- Atualizar `docs/api.md` (endpoints, `multipart/form-data`, nomes de campos, limites, erros) junto com a implementação. Não inventar endpoints além dos pedidos.
+- Testes: Supertest com `.attach()` e fixtures pequenas em `tests/fixtures/`; cobrir sucesso (arquivo existe em disco e path salvo), MIME inválido, arquivo corrompido, acima do limite, sem auth (401) e ownership (403).
+
+## E-mail (notificação de nova reply)
+
+Quando alguém cria uma reply em um post, o **autor do post** recebe um e-mail. Não notificar se o autor da reply é o próprio autor do post.
+
+- **Nodemailer** só na implementação de uma porta `Mailer` (interface em `src/mail/`, implementação `nodemailer-mailer.ts`), injetada no use case `create-reply`. Use case não importa `nodemailer`; o template do e-mail (assunto/texto) é montado fora do transporte.
+- **Falha de e-mail nunca derruba a criação da reply**: a reply é persistida e responde **201** mesmo se o envio falhar (capturar e logar o erro). Não bloquear a resposta HTTP esperando SMTP quando possível, mas os testes precisam conseguir aguardar o envio de forma determinística.
+- Nunca incluir senha, token ou dados sensíveis no e-mail. Escapar o conteúdo da reply se o e-mail tiver HTML.
+- **Mailpit** é o SMTP de desenvolvimento e teste: adicionar serviço `mailpit` ao `docker-compose.yml` (SMTP `1025`, UI/API HTTP `8025`; portas de host configuráveis). Configuração por env, documentada em `.env.example`: `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM` (e `MAIL_API_URL` / `MAILPIT_URL` para os testes). Sem credenciais reais no repositório.
+- Testes de integração enviam via SMTP real para o Mailpit e verificam pela API HTTP do Mailpit (`/api/v1/messages`, destinatário, assunto); limpar as mensagens (`DELETE /api/v1/messages`) em `beforeEach`. Também cobrir: sem e-mail quando o autor da reply é o dono do post, e reply criada com sucesso quando o SMTP está indisponível. Os testes exigem o Mailpit rodando (`npm run db:up` / compose); manter os scripts de `npm test` iniciando-o.
+- Comportamento de e-mail não altera o contrato HTTP; documentar a notificação em `docs/api.md` apenas como efeito colateral.
 
 ## Fora de escopo (PRD)
 
-Perfil, troca de senha, logout/invalidação explícita, roles, soft delete, rascunhos, slug, upload, tags, threads de replies, edição de reply, paginação de replies e likes em replies.
+Perfil (exceto avatar e foto de post descritos acima), troca de senha, logout/invalidação explícita, roles, soft delete, rascunhos, slug, tags, threads de replies, edição de reply, paginação de replies e likes em replies. Upload limitado a avatar do usuário e foto do post; e-mail limitado à notificação de nova reply.
