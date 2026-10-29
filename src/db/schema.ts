@@ -6,6 +6,7 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   password: text('password').notNull(),
   token: text('token'),
+  avatarPath: text('avatar_path'),
 });
 
 export const posts = pgTable('posts', {
@@ -13,6 +14,7 @@ export const posts = pgTable('posts', {
   title: varchar('title', { length: 200 }).notNull(),
   content: text('content').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  imagePath: text('image_path'),
   authorId: integer('author_id')
     .notNull()
     .references(() => users.id),

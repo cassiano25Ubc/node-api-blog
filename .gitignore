@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+/uploads/*
+!/uploads/.gitkeep
+/uploads-test/
 
 # Env
 .env
