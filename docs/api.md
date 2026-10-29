@@ -152,7 +152,7 @@ Todas as respostas de erro usam o mesmo envelope:
 
 | Endpoint | `likesCount` | `likedByMe` | `replies` |
 |----------|--------------|-------------|-----------|
-| `GET /api/posts` | sim | não | não |
+| `GET /api/posts` | sim | não | sim (array completo, sem paginação, `createdAt` asc) |
 | `GET /api/posts/:id` | sim | sim | sim (array completo, sem paginação, `createdAt` asc) |
 | `POST /api/posts` / `PUT /api/posts/:id` | não | não | não |
 
@@ -273,7 +273,7 @@ Autentica com e-mail e senha. Em sucesso, gera e persiste novo token de sessão 
 
 ### 5.3 `GET /api/posts`
 
-Listagem pública de posts em ordem cronológica inversa (`createdAt` desc). Inclui o nome do autor (não o e-mail) e `likesCount`. **Não** inclui `likedByMe` nem o array `replies`.
+Listagem pública e paginada de posts em ordem cronológica inversa (`createdAt` desc). Inclui o nome do autor (não o e-mail), `likesCount` e todas as `replies` de cada post, ordenadas por `createdAt` **asc**. A paginação se aplica aos posts, não às replies. Não inclui `likedByMe`.
 
 | | |
 |--|--|
@@ -298,6 +298,17 @@ Listagem pública de posts em ordem cronológica inversa (`createdAt` desc). Inc
       "content": "string",
       "createdAt": "2026-08-07T21:00:00.000Z",
       "likesCount": 0,
+      "replies": [
+        {
+          "id": 1,
+          "content": "string",
+          "createdAt": "2026-08-07T21:00:00.000Z",
+          "author": {
+            "id": 1,
+            "name": "string"
+          }
+        }
+      ],
       "author": {
         "id": 1,
         "name": "string"
@@ -315,6 +326,7 @@ Listagem pública de posts em ordem cronológica inversa (`createdAt` desc). Inc
 
 - Página sem resultados retorna `data: []` com `meta` coerente (não é 404).
 - `likesCount` é `0` quando o post não tem likes.
+- `replies` é `[]` quando o post não tem respostas; quando houver, inclui todas, sem paginação e sem e-mail do autor.
 
 **400** — `VALIDATION_ERROR` — `page` inválida (ex.: `0`, negativo, não numérico)
 

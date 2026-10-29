@@ -78,6 +78,7 @@ describe('GET /api/posts', () => {
         content: 'Content 3',
         createdAt: third.createdAt,
         likesCount: 0,
+        replies: [],
         author: { id: alice.user.id, name: 'Alice' },
       },
       {
@@ -86,6 +87,7 @@ describe('GET /api/posts', () => {
         content: 'Content 2',
         createdAt: second.createdAt,
         likesCount: 0,
+        replies: [],
         author: { id: bob.user.id, name: 'Bob' },
       },
       {
@@ -94,6 +96,7 @@ describe('GET /api/posts', () => {
         content: 'Content 1',
         createdAt: first.createdAt,
         likesCount: 0,
+        replies: [],
         author: { id: alice.user.id, name: 'Alice' },
       },
     ]);
@@ -160,6 +163,7 @@ describe('GET /api/posts', () => {
           content: 'World',
           createdAt: post.createdAt,
           likesCount: 0,
+          replies: [],
           author: { id: user.id, name: 'Alice' },
         },
       ],
@@ -194,6 +198,7 @@ describe('GET /api/posts', () => {
         content: 'No likes',
         createdAt: lonely.createdAt,
         likesCount: 0,
+        replies: [],
         author: { id: alice.user.id, name: 'Alice' },
       },
       {
@@ -202,11 +207,64 @@ describe('GET /api/posts', () => {
         content: 'Many likes',
         createdAt: popular.createdAt,
         likesCount: 3,
+        replies: [],
         author: { id: alice.user.id, name: 'Alice' },
       },
     ]);
     expect(response.body.data.every((post: { likedByMe?: boolean }) => post.likedByMe === undefined)).toBe(true);
-    expect(response.body.data.every((post: { replies?: unknown }) => post.replies === undefined)).toBe(true);
+  });
+
+  it('includes all replies for each listed post in chronological order', async () => {
+    const alice = await registerUser('Alice', 'alice@example.com');
+    const bob = await registerUser('Bob', 'bob@example.com');
+    const postWithReplies = await createPost(alice.token, 'With replies', 'Has replies');
+    const postWithoutReplies = await createPost(alice.token, 'Without replies', 'No replies');
+
+    const firstReply = await request(app)
+      .post(`/api/posts/${postWithReplies.id}/replies`)
+      .set('Authorization', `Bearer ${bob.token}`)
+      .send({ content: 'First reply' });
+    const secondReply = await request(app)
+      .post(`/api/posts/${postWithReplies.id}/replies`)
+      .set('Authorization', `Bearer ${alice.token}`)
+      .send({ content: 'Second reply' });
+
+    const response = await request(app).get('/api/posts');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([
+      {
+        id: postWithoutReplies.id,
+        title: 'Without replies',
+        content: 'No replies',
+        createdAt: postWithoutReplies.createdAt,
+        likesCount: 0,
+        replies: [],
+        author: { id: alice.user.id, name: 'Alice' },
+      },
+      {
+        id: postWithReplies.id,
+        title: 'With replies',
+        content: 'Has replies',
+        createdAt: postWithReplies.createdAt,
+        likesCount: 0,
+        replies: [
+          {
+            id: firstReply.body.id,
+            content: 'First reply',
+            createdAt: firstReply.body.createdAt,
+            author: { id: bob.user.id, name: 'Bob' },
+          },
+          {
+            id: secondReply.body.id,
+            content: 'Second reply',
+            createdAt: secondReply.body.createdAt,
+            author: { id: alice.user.id, name: 'Alice' },
+          },
+        ],
+        author: { id: alice.user.id, name: 'Alice' },
+      },
+    ]);
   });
 
   it('returns 400 VALIDATION_ERROR for invalid page', async () => {

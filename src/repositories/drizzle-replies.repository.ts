@@ -1,7 +1,13 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { replies, users } from '../db/schema.js';
-import type { CreateReplyData, RepliesRepository, ReplyRecord, ReplyWithAuthorRow } from './replies.repository.js';
+import type {
+  CreateReplyData,
+  RepliesRepository,
+  ReplyRecord,
+  ReplyWithAuthorRow,
+  ReplyWithPostAndAuthorRow,
+} from './replies.repository.js';
 
 export class DrizzleRepliesRepository implements RepliesRepository {
   async create(data: CreateReplyData): Promise<Omit<ReplyRecord, 'authorId' | 'postId'>> {
@@ -41,6 +47,26 @@ export class DrizzleRepliesRepository implements RepliesRepository {
       .from(replies)
       .innerJoin(users, eq(replies.authorId, users.id))
       .where(eq(replies.postId, postId))
+      .orderBy(asc(replies.createdAt));
+  }
+
+  async listByPostIds(postIds: number[]): Promise<ReplyWithPostAndAuthorRow[]> {
+    if (postIds.length === 0) {
+      return [];
+    }
+
+    return db
+      .select({
+        id: replies.id,
+        content: replies.content,
+        createdAt: replies.createdAt,
+        authorId: users.id,
+        authorName: users.name,
+        postId: replies.postId,
+      })
+      .from(replies)
+      .innerJoin(users, eq(replies.authorId, users.id))
+      .where(inArray(replies.postId, postIds))
       .orderBy(asc(replies.createdAt));
   }
 

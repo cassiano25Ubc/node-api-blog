@@ -20,7 +20,7 @@ const postsRepository = new DrizzlePostsRepository();
 const likesRepository = new DrizzleLikesRepository();
 const repliesRepository = new DrizzleRepliesRepository();
 
-const listPosts = new ListPostsUseCase(postsRepository, likesRepository);
+const listPosts = new ListPostsUseCase(postsRepository, likesRepository, repliesRepository);
 const getPost = new GetPostUseCase(postsRepository, likesRepository, repliesRepository);
 const createPost = new CreatePostUseCase(postsRepository);
 const updatePost = new UpdatePostUseCase(postsRepository);

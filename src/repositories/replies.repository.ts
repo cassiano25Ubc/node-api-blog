@@ -20,9 +20,14 @@ export type ReplyWithAuthorRow = {
   authorName: string;
 };
 
+export type ReplyWithPostAndAuthorRow = ReplyWithAuthorRow & {
+  postId: number;
+};
+
 export interface RepliesRepository {
   create(data: CreateReplyData): Promise<Omit<ReplyRecord, 'authorId' | 'postId'>>;
   findById(replyId: number): Promise<ReplyRecord | null>;
   listByPostId(postId: number): Promise<ReplyWithAuthorRow[]>;
+  listByPostIds(postIds: number[]): Promise<ReplyWithPostAndAuthorRow[]>;
   delete(replyId: number): Promise<void>;
 }

@@ -38,6 +38,7 @@ export type PostResponseDto = {
 
 export type PostListItemDto = PostResponseDto & {
   likesCount: number;
+  replies: ReplyResponseDto[];
 };
 
 export type PostDetailDto = PostResponseDto & {
@@ -81,13 +82,16 @@ export function toPostDetailDto(
 }
 
 export function toListPostsResponseDto(
-  rows: (PostWithAuthorLike & { likesCount: number })[],
+  rows: (PostWithAuthorLike & { likesCount: number; replies: ReplyWithAuthorLike[] })[],
   meta: { page: number; limit: number; total: number },
 ): ListPostsResponseDto {
   return {
     data: rows.map((row) => ({
       ...toPostResponseDto(row, { id: row.authorId, name: row.authorName }),
       likesCount: row.likesCount,
+      replies: row.replies.map((reply) =>
+        toReplyResponseDto(reply, { id: reply.authorId, name: reply.authorName }),
+      ),
     })),
     meta: {
       page: meta.page,
