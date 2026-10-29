@@ -63,6 +63,38 @@ describe('DELETE /api/posts/:id/likes', () => {
     expect(stored).toBeUndefined();
   });
 
+  it('updates likesCount and likedByMe after unliking a post', async () => {
+    const alice = await registerUser('Alice', 'alice@example.com');
+    const bob = await registerUser('Bob', 'bob@example.com');
+    const post = await createPost(alice.token);
+    await likePost(bob.token, post.id);
+
+    const likedPost = await request(app)
+      .get(`/api/posts/${post.id}`)
+      .set('Authorization', 'Bearer ' + bob.token);
+
+    expect(likedPost.status).toBe(200);
+    expect(likedPost.body.likesCount).toBe(1);
+    expect(likedPost.body.likedByMe).toBe(true);
+
+    const unlikeResponse = await request(app)
+      .delete(`/api/posts/${post.id}/likes`)
+      .set('Authorization', 'Bearer ' + bob.token);
+
+    expect(unlikeResponse.status).toBe(204);
+
+    const unlikedPost = await request(app)
+      .get(`/api/posts/${post.id}`)
+      .set('Authorization', 'Bearer ' + bob.token);
+    const postList = await request(app).get('/api/posts');
+
+    expect(unlikedPost.status).toBe(200);
+    expect(unlikedPost.body.likesCount).toBe(0);
+    expect(unlikedPost.body.likedByMe).toBe(false);
+    expect(postList.status).toBe(200);
+    expect(postList.body.data.find((item: { id: number }) => item.id === post.id).likesCount).toBe(0);
+  });
+
   it('allows the author to unlike their own post', async () => {
     const { token, user } = await registerUser('Alice', 'alice@example.com');
     const post = await createPost(token);
