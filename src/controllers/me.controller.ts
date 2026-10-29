@@ -4,11 +4,17 @@ import { AppError } from '../errors/app-error.js';
 import { DrizzleUsersRepository } from '../repositories/drizzle-users.repository.js';
 import { SharpImageStorage } from '../storage/sharp-image-storage.js';
 import { UpdateAvatarUseCase } from '../use-cases/auth/update-avatar.js';
+import { GetMeUseCase } from '../use-cases/auth/get-me.js';
 
-const updateAvatar = new UpdateAvatarUseCase(
-  new DrizzleUsersRepository(),
-  new SharpImageStorage(),
-);
+const usersRepository = new DrizzleUsersRepository();
+const getMe = new GetMeUseCase(usersRepository);
+const updateAvatar = new UpdateAvatarUseCase(usersRepository, new SharpImageStorage());
+
+export async function getMeController(req: Request, res: Response): Promise<void> {
+  const user = await getMe.execute(req.user!.id);
+
+  res.status(200).json(toUserProfileDto(user));
+}
 
 export async function updateAvatarController(req: Request, res: Response): Promise<void> {
   if (!req.file) {
