@@ -1,6 +1,7 @@
 import { AppError } from '../../errors/app-error.js';
 import type { Mailer } from '../../mail/mailer.js';
-import type { PostsRepository } from '../../repositories/posts.repository.js';
+import { buildNewReplyEmail } from '../../mail/new-reply-email.js';
+import type { PostRecord, PostsRepository } from '../../repositories/posts.repository.js';
 import type { RepliesRepository } from '../../repositories/replies.repository.js';
 import type { UsersRepository } from '../../repositories/users.repository.js';
 import type { CreateReplyBody } from '../../schemas/replies.schemas.js';
@@ -16,8 +17,8 @@ export class CreateReplyUseCase {
   constructor(
     private readonly postsRepository: PostsRepository,
     private readonly repliesRepository: RepliesRepository,
-    _usersRepository: UsersRepository,
-    _mailer: Mailer,
+    private readonly usersRepository: UsersRepository,
+    private readonly mailer: Mailer,
   ) {}
 
   async execute({ author, postId, data }: CreateReplyInput) {
@@ -30,6 +31,29 @@ export class CreateReplyUseCase {
       postId,
     });
 
+    if (existing.authorId !== author.id) {
+      await this.notifyPostAuthor(existing, author, data.content);
+    }
+
     return reply;
+  }
+
+  private async notifyPostAuthor(post: PostRecord, replyAuthor: AuthUser, content: string) {
+    try {
+      const postAuthor = await this.usersRepository.findById(post.authorId);
+      if (!postAuthor) return;
+
+      await this.mailer.send(
+        buildNewReplyEmail({
+          to: postAuthor.email,
+          postAuthorName: postAuthor.name,
+          postTitle: post.title,
+          replyAuthorName: replyAuthor.name,
+          replyContent: content,
+        }),
+      );
+    } catch (error) {
+      console.error('Failed to send reply notification e-mail', error);
+    }
   }
 }
