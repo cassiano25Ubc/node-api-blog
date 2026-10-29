@@ -23,6 +23,7 @@ export class DrizzlePostsRepository implements PostsRepository {
           createdAt: posts.createdAt,
           authorId: users.id,
           authorName: users.name,
+          imagePath: posts.imagePath,
         })
         .from(posts)
         .innerJoin(users, eq(posts.authorId, users.id))
@@ -44,6 +45,7 @@ export class DrizzlePostsRepository implements PostsRepository {
         createdAt: posts.createdAt,
         authorId: users.id,
         authorName: users.name,
+        imagePath: posts.imagePath,
       })
       .from(posts)
       .innerJoin(users, eq(posts.authorId, users.id))
@@ -66,6 +68,7 @@ export class DrizzlePostsRepository implements PostsRepository {
         title: posts.title,
         content: posts.content,
         createdAt: posts.createdAt,
+        imagePath: posts.imagePath,
       });
 
     return post;
@@ -92,9 +95,45 @@ export class DrizzlePostsRepository implements PostsRepository {
         title: posts.title,
         content: posts.content,
         createdAt: posts.createdAt,
+        imagePath: posts.imagePath,
       });
 
     return post;
+  }
+
+  async updateImagePath(
+    postId: number,
+    imagePath: string,
+  ): Promise<{ post: Omit<PostRecord, 'authorId'>; previousImagePath: string | null } | null> {
+    return db.transaction(async (transaction) => {
+      const [current] = await transaction
+        .select({ imagePath: posts.imagePath })
+        .from(posts)
+        .where(eq(posts.id, postId))
+        .for('update');
+
+      if (!current) {
+        return null;
+      }
+
+      const [post] = await transaction
+        .update(posts)
+        .set({ imagePath })
+        .where(eq(posts.id, postId))
+        .returning({
+          id: posts.id,
+          title: posts.title,
+          content: posts.content,
+          createdAt: posts.createdAt,
+          imagePath: posts.imagePath,
+        });
+
+      if (!post) {
+        throw new Error(`Failed to update image for post ${postId}`);
+      }
+
+      return { post, previousImagePath: current.imagePath };
+    });
   }
 
   async delete(postId: number): Promise<void> {

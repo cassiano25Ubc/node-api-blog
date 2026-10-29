@@ -570,7 +570,7 @@ Atualização **parcial** do próprio post. Pode enviar só `title`, só `conten
 
 ### 5.9 `PUT /api/posts/:id/image`
 
-Atualiza a imagem do próprio post. A imagem deve ser enviada como `multipart/form-data` no campo `image`. São aceitos JPEG, PNG e WebP; o conteúdo deve ser uma imagem válida, não apenas declarar um MIME aceito. O arquivo é normalizado para WebP e a API expõe sua URL pública em `imageUrl`.
+Atualiza a imagem do próprio post. A imagem deve ser enviada como `multipart/form-data` no campo `image`. São aceitos JPEG, PNG e WebP; o conteúdo deve ser uma imagem válida, não apenas declarar um MIME aceito. A imagem mantém sua proporção, não é ampliada e é redimensionada para caber em no máximo 1280×720 pixels (720p), normalizada para WebP e salva com nome UUID. A API expõe sua URL pública em `imageUrl`.
 
 | | |
 |--|--|

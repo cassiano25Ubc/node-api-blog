@@ -60,6 +60,7 @@ describe('PUT /api/posts/:id', () => {
       title: 'Updated title',
       content: 'Updated content',
       createdAt: post.createdAt,
+      imageUrl: null,
       author: {
         id: user.id,
         name: 'Alice',

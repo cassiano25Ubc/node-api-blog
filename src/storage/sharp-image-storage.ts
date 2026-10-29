@@ -1,37 +1,26 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import { AppError } from '../errors/app-error.js';
 import type { ImageStorage } from './image-storage.js';
 
 export class SharpImageStorage implements ImageStorage {
   async saveAvatar(image: Buffer): Promise<string> {
-    let normalizedImage: Buffer;
+    return this.save(image, 'avatars', (pipeline) =>
+      pipeline.resize(200, 200, { fit: 'cover' }),
+    );
+  }
 
-    try {
-      normalizedImage = await sharp(image)
-        .rotate()
-        .resize(200, 200, { fit: 'cover' })
-        .webp()
-        .toBuffer();
-    } catch (error) {
-      if (!isInvalidImageError(error)) {
-        throw error;
-      }
-
-      throw new AppError(400, 'VALIDATION_ERROR', 'Image content is invalid', [
-        { path: 'image', message: 'File must contain a valid image' },
-      ]);
-    }
-
-    const relativePath = `avatars/${randomUUID()}.webp`;
-    const absolutePath = this.resolvePath(relativePath);
-
-    await mkdir(path.dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, normalizedImage, { flag: 'wx' });
-
-    return relativePath;
+  async savePostImage(image: Buffer): Promise<string> {
+    return this.save(image, 'posts', (pipeline) =>
+      pipeline.resize({
+        width: 1280,
+        height: 720,
+        fit: 'inside',
+        withoutEnlargement: true,
+      }),
+    );
   }
 
   async remove(relativePath: string): Promise<void> {
@@ -44,6 +33,36 @@ export class SharpImageStorage implements ImageStorage {
 
       throw error;
     }
+  }
+
+  private async save(
+    image: Buffer,
+    directory: 'avatars' | 'posts',
+    resize: (pipeline: Sharp) => Sharp,
+  ): Promise<string> {
+    let normalizedImage: Buffer;
+
+    try {
+      normalizedImage = await resize(sharp(image).rotate())
+        .webp()
+        .toBuffer();
+    } catch (error) {
+      if (!isInvalidImageError(error)) {
+        throw error;
+      }
+
+      throw new AppError(400, 'VALIDATION_ERROR', 'Image content is invalid', [
+        { path: 'image', message: 'File must contain a valid image' },
+      ]);
+    }
+
+    const relativePath = `${directory}/${randomUUID()}.webp`;
+    const absolutePath = this.resolvePath(relativePath);
+
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, normalizedImage, { flag: 'wx' });
+
+    return relativePath;
   }
 
   private resolvePath(relativePath: string): string {

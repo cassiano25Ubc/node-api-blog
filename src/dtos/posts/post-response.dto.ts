@@ -1,10 +1,12 @@
 import { toReplyResponseDto, type ReplyResponseDto } from '../replies/reply-response.dto.js';
+import { toPublicImageUrl } from '../../storage/public-image-url.js';
 
 type PostLike = {
   id: number;
   title: string;
   content: string;
   createdAt: Date;
+  imagePath: string | null;
 };
 
 type ReplyWithAuthorLike = {
@@ -30,6 +32,7 @@ export type PostResponseDto = {
   title: string;
   content: string;
   createdAt: string;
+  imageUrl: string | null;
   author: {
     id: number;
     name: string;
@@ -63,6 +66,7 @@ export function toPostResponseDto(post: PostLike, author: AuthorLike): PostRespo
     title: post.title,
     content: post.content,
     createdAt: post.createdAt.toISOString(),
+    imageUrl: toPublicImageUrl(post.imagePath),
     author: { id: author.id, name: author.name },
   };
 }
