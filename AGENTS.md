@@ -34,12 +34,12 @@ cp .env.example .env   # se ainda não existir
 npm run db:up          # Postgres app :6000 e teste :6001
 npm run db:migrate
 npm run dev            # http://localhost:3000
-npm test               # NODE_ENV=test vitest run
+npm test               # inicia/migra db-test e executa Vitest
 ```
 
 Outros: `db:generate` (drizzle-kit), `db:studio`, `db:down`, `build`, `start`.
 
-Testes precisam do container `db-test` no ar. `fileParallelism: false` no Vitest — os specs compartilham o mesmo banco.
+Os testes precisam do Docker em execução e de `DATABASE_URL_TEST` configurada no `.env`. `npm test` inicia `db-test`, aplica as migrations nesse banco e executa Vitest. `fileParallelism: false` no Vitest — os specs compartilham o mesmo banco.
 
 ## Mapa de pastas
 
