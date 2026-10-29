@@ -305,7 +305,7 @@ Retorna os dados do usuário autenticado. `avatarUrl` é `null` enquanto o usuá
 
 ### 5.4 `PUT /api/me/avatar`
 
-Atualiza o avatar do usuário autenticado. A imagem deve ser enviada como `multipart/form-data` no campo `image`. São aceitos JPEG, PNG e WebP; o conteúdo deve ser uma imagem válida, não apenas declarar um MIME aceito. O arquivo é normalizado para WebP e a API expõe sua URL pública em `avatarUrl`.
+Atualiza o avatar do usuário autenticado. A imagem deve ser enviada como `multipart/form-data` no campo `image`. São aceitos JPEG, PNG e WebP; o conteúdo deve ser uma imagem válida, não apenas declarar um MIME aceito. A imagem é recortada para 200×200 pixels, normalizada para WebP e salva com nome UUID; a API expõe sua URL pública em `avatarUrl`.
 
 | | |
 |--|--|
@@ -316,7 +316,7 @@ Atualiza o avatar do usuário autenticado. A imagem deve ser enviada como `multi
 
 | Campo | Tipo | Obrigatório | Regras |
 |-------|------|-------------|--------|
-| `image` | arquivo | Sim | MIME `image/jpeg`, `image/png` ou `image/webp`; conteúdo deve ser uma imagem válida; sujeito ao limite de tamanho da API |
+| `image` | arquivo | Sim | MIME `image/jpeg`, `image/png` ou `image/webp`; conteúdo deve ser uma imagem válida; tamanho máximo de 5 MiB |
 
 #### Respostas
 
@@ -587,7 +587,7 @@ Atualiza a imagem do próprio post. A imagem deve ser enviada como `multipart/fo
 
 | Campo | Tipo | Obrigatório | Regras |
 |-------|------|-------------|--------|
-| `image` | arquivo | Sim | MIME `image/jpeg`, `image/png` ou `image/webp`; conteúdo deve ser uma imagem válida; sujeito ao limite de tamanho da API |
+| `image` | arquivo | Sim | MIME `image/jpeg`, `image/png` ou `image/webp`; conteúdo deve ser uma imagem válida; tamanho máximo de 5 MiB |
 
 #### Respostas
 

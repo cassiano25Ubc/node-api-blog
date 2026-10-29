@@ -42,6 +42,7 @@ describe('POST /api/auth/login', () => {
         id: registered.user.id,
         name: 'Alice',
         email: 'alice@example.com',
+        avatarUrl: null,
       },
     });
     expect(response.body.token.length).toBeGreaterThan(0);

@@ -1,8 +1,5 @@
-type UserLike = {
-  id: number;
-  name: string;
-  email: string;
-};
+import type { UserPublic } from '../../repositories/users.repository.js';
+import { toUserProfileDto } from './user-profile.dto.js';
 
 export type AuthResponseDto = {
   token: string;
@@ -10,16 +7,13 @@ export type AuthResponseDto = {
     id: number;
     name: string;
     email: string;
+    avatarUrl: string | null;
   };
 };
 
-export function toAuthResponseDto(token: string, user: UserLike): AuthResponseDto {
+export function toAuthResponseDto(token: string, user: UserPublic): AuthResponseDto {
   return {
     token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-    },
+    user: toUserProfileDto(user),
   };
 }

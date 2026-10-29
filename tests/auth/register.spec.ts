@@ -31,6 +31,7 @@ describe('POST /api/auth/register', () => {
         id: expect.any(Number),
         name: 'Alice',
         email: 'alice@example.com',
+        avatarUrl: null,
       },
     });
     expect(response.body.token.length).toBeGreaterThan(0);
