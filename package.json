@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test:prepare": "docker compose up -d db-test && drizzle-kit migrate --config=drizzle.test.config.ts",
+    "test:prepare": "docker compose up -d db-test mailpit && drizzle-kit migrate --config=drizzle.test.config.ts",
     "test": "npm run test:prepare && vitest run",
     "test:watch": "npm run test:prepare && vitest",
     "db:generate": "drizzle-kit generate",
