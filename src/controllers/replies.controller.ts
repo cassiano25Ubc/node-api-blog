@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
 import { toReplyResponseDto } from '../dtos/replies/reply-response.dto.js';
+import { NodemailerMailer } from '../mail/nodemailer-mailer.js';
+import { DrizzleUsersRepository } from '../repositories/drizzle-users.repository.js';
 import { DrizzlePostsRepository } from '../repositories/drizzle-posts.repository.js';
 import { DrizzleRepliesRepository } from '../repositories/drizzle-replies.repository.js';
 import {
@@ -14,7 +16,15 @@ import { validate } from '../utils/validate.js';
 const postsRepository = new DrizzlePostsRepository();
 const repliesRepository = new DrizzleRepliesRepository();
 
-const createReply = new CreateReplyUseCase(postsRepository, repliesRepository);
+const usersRepository = new DrizzleUsersRepository();
+const mailer = new NodemailerMailer();
+
+const createReply = new CreateReplyUseCase(
+  postsRepository,
+  repliesRepository,
+  usersRepository,
+  mailer,
+);
 const deleteReply = new DeleteReplyUseCase(postsRepository, repliesRepository);
 
 export async function createReplyController(req: Request, res: Response): Promise<void> {

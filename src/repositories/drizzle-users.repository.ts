@@ -10,6 +10,20 @@ import type {
 } from './users.repository.js';
 
 export class DrizzleUsersRepository implements UsersRepository {
+  async findById(userId: number): Promise<UserPublic | null> {
+    const [user] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        avatarPath: users.avatarPath,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    return user ?? null;
+  }
+
   async findByEmail(email: string): Promise<UserRecord | null> {
     const user = await db.query.users.findFirst({
       where: eq(users.email, email),

@@ -27,6 +27,7 @@ export type AvatarUpdateResult = {
 };
 
 export interface UsersRepository {
+  findById(userId: number): Promise<UserPublic | null>;
   findByEmail(email: string): Promise<UserRecord | null>;
   create(data: CreateUserData): Promise<UserPublic>;
   updateToken(userId: number, token: string): Promise<void>;
