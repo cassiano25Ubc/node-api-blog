@@ -1,6 +1,6 @@
 import type { MailMessage } from './mailer.js';
 
-type NewReplyEmailInput = {
+export type NewReplyEmailInput = {
   to: string;
   postAuthorName: string;
   postTitle: string;

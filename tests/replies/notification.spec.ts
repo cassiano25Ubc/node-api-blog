@@ -1,26 +1,43 @@
 import request from 'supertest';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { Worker } from 'bullmq';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
+import { redisConnection } from '../../src/queues/connection.js';
+import { newReplyEmailQueue } from '../../src/queues/new-reply-email/queue.js';
+import { startNewReplyEmailWorker } from '../../src/queues/new-reply-email/worker.js';
 import { cleanDatabase, closeDatabase } from '../helpers/database.js';
 import { clearMailbox, getMessageText, listMessages } from '../helpers/mailpit.js';
 
 describe('reply e-mail notification', () => {
   const app = createApp();
   const originalSmtpPort = process.env.SMTP_PORT;
+  let worker: Worker;
 
   beforeEach(async () => {
     await cleanDatabase();
     await clearMailbox();
+    await newReplyEmailQueue.obliterate({ force: true });
+    worker = startNewReplyEmailWorker();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await worker.close();
     if (originalSmtpPort === undefined) delete process.env.SMTP_PORT;
     else process.env.SMTP_PORT = originalSmtpPort;
   });
 
   afterAll(async () => {
     await closeDatabase();
+    await newReplyEmailQueue.close();
+    redisConnection.disconnect();
   });
+
+  async function waitForQueueToSettle() {
+    await vi.waitFor(async () => {
+      const counts = await newReplyEmailQueue.getJobCounts('waiting', 'active', 'delayed');
+      expect(counts.waiting + counts.active + counts.delayed).toBe(0);
+    });
+  }
 
   async function registerUser(name: string, email: string) {
     const response = await request(app)
@@ -55,8 +72,11 @@ describe('reply e-mail notification', () => {
 
     expect(response.status).toBe(201);
 
-    const messages = await listMessages();
-    expect(messages).toHaveLength(1);
+    const messages = await vi.waitFor(async () => {
+      const found = await listMessages();
+      expect(found).toHaveLength(1);
+      return found;
+    });
     expect(messages[0].To.map((to) => to.Address)).toEqual(['alice@example.com']);
     expect(messages[0].Subject).toContain('My post');
 
@@ -68,6 +88,26 @@ describe('reply e-mail notification', () => {
     expect(message.Text).not.toContain(alice.token);
   });
 
+  it('enqueues a job with the ready-to-send data instead of only ids', async () => {
+    await worker.close();
+    const alice = await registerUser('Alice', 'alice@example.com');
+    const bob = await registerUser('Bob', 'bob@example.com');
+    const post = await createPost(alice.token);
+
+    const response = await reply(post.id, bob.token, 'Nice post!');
+
+    expect(response.status).toBe(201);
+    const jobs = await newReplyEmailQueue.getJobs(['waiting']);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].data).toEqual({
+      to: 'alice@example.com',
+      postAuthorName: 'Alice',
+      postTitle: 'My post',
+      replyAuthorName: 'Bob',
+      replyContent: 'Nice post!',
+    });
+  });
+
   it('does not send an e-mail when the author replies to their own post', async () => {
     const alice = await registerUser('Alice', 'alice@example.com');
     const post = await createPost(alice.token);
@@ -75,6 +115,7 @@ describe('reply e-mail notification', () => {
     const response = await reply(post.id, alice.token, 'Self reply');
 
     expect(response.status).toBe(201);
+    await waitForQueueToSettle();
     expect(await listMessages()).toHaveLength(0);
   });
 
@@ -86,6 +127,7 @@ describe('reply e-mail notification', () => {
     const response = await reply(post.id, bob.token, '');
 
     expect(response.status).toBe(400);
+    await waitForQueueToSettle();
     expect(await listMessages()).toHaveLength(0);
   });
 
@@ -99,6 +141,11 @@ describe('reply e-mail notification', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.content).toBe('Still saved');
+
+    // the first attempt failed and the job is waiting for its retry
+    await vi.waitFor(async () => {
+      expect((await newReplyEmailQueue.getJobCounts('delayed')).delayed).toBe(1);
+    });
     expect(await listMessages()).toHaveLength(0);
   });
 
@@ -109,7 +156,11 @@ describe('reply e-mail notification', () => {
 
     await reply(post.id, bob.token, '<script>alert(1)</script>');
 
-    const [message] = await listMessages();
+    const [message] = await vi.waitFor(async () => {
+      const found = await listMessages();
+      expect(found).toHaveLength(1);
+      return found;
+    });
     const body = await getMessageText(message.ID);
     expect(body.HTML).not.toContain('<script>');
     expect(body.HTML).toContain('&lt;script&gt;');

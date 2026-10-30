@@ -729,7 +729,7 @@ Nenhum.
 
 ### 5.13 `POST /api/posts/:id/replies`
 
-Cria uma reply no post. `createdAt` é definido no momento da criação. `authorId` vem do usuário do token. Não há thread: reply só existe no post, nunca em outra reply. Após persistir a reply, envia um e-mail de notificação ao autor do post, exceto quando o autor da reply é o próprio autor do post. Falha no envio é registrada, mas não impede a criação da reply nem altera a resposta HTTP.
+Cria uma reply no post. `createdAt` é definido no momento da criação. `authorId` vem do usuário do token. Não há thread: reply só existe no post, nunca em outra reply. Após persistir a reply, enfileira (BullMQ/Redis) um job com os dados prontos do e-mail de notificação, enviado de forma assíncrona por um worker ao autor do post, exceto quando o autor da reply é o próprio autor do post. Falha ao enfileirar ou ao enviar (o job é reexecutado até 3 vezes) é registrada, mas não impede a criação da reply nem altera a resposta HTTP.
 
 | | |
 |--|--|
