@@ -1,5 +1,7 @@
 import type { NewReplyEmailInput } from '../mail/new-reply-email.js';
 
+export type ReplyNotificationJobData = NewReplyEmailInput;
+
 export interface ReplyNotificationJobsRepository {
-  enqueue(payload: NewReplyEmailInput): Promise<void>;
+  enqueue(data: ReplyNotificationJobData): Promise<void>;
 }
