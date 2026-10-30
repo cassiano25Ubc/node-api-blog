@@ -1,13 +1,13 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
-import { startNewReplyEmailWorker } from './queues/new-reply-email/worker.js';
+import { startReplyNotificationWorker } from './queues/reply-notification/worker.js';
 import { startPingWorker } from './queues/pings/worker.js';
 
 const port = Number(process.env.PORT) || 3000;
 const app = createApp();
 
 startPingWorker()
-startNewReplyEmailWorker()
+startReplyNotificationWorker()
 
 
 app.listen(port, () => {

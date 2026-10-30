@@ -1,6 +1,6 @@
 import { AppError } from '../../errors/app-error.js';
 import type { PostRecord, PostsRepository } from '../../repositories/posts.repository.js';
-import type { NewReplyEmailJobsRepository } from '../../repositories/new-reply-email-jobs.repository.js';
+import type { ReplyNotificationJobsRepository } from '../../repositories/reply-notification-jobs.repository.js';
 import type { RepliesRepository } from '../../repositories/replies.repository.js';
 import type { UsersRepository } from '../../repositories/users.repository.js';
 import type { CreateReplyBody } from '../../schemas/replies.schemas.js';
@@ -17,7 +17,7 @@ export class CreateReplyUseCase {
     private readonly postsRepository: PostsRepository,
     private readonly repliesRepository: RepliesRepository,
     private readonly usersRepository: UsersRepository,
-    private readonly emailJobs: NewReplyEmailJobsRepository,
+    private readonly notificationJobs: ReplyNotificationJobsRepository,
   ) {}
 
   async execute({ author, postId, data }: CreateReplyInput) {
@@ -42,7 +42,7 @@ export class CreateReplyUseCase {
       const postAuthor = await this.usersRepository.findById(post.authorId);
       if (!postAuthor) return;
 
-      await this.emailJobs.enqueue({
+      await this.notificationJobs.enqueue({
         to: postAuthor.email,
         postAuthorName: postAuthor.name,
         postTitle: post.title,

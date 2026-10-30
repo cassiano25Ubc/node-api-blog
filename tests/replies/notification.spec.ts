@@ -3,8 +3,8 @@ import type { Worker } from 'bullmq';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { redisConnection } from '../../src/queues/connection.js';
-import { newReplyEmailQueue } from '../../src/queues/new-reply-email/queue.js';
-import { startNewReplyEmailWorker } from '../../src/queues/new-reply-email/worker.js';
+import { replyNotificationQueue } from '../../src/queues/reply-notification/queue.js';
+import { startReplyNotificationWorker } from '../../src/queues/reply-notification/worker.js';
 import { cleanDatabase, closeDatabase } from '../helpers/database.js';
 import { clearMailbox, getMessageText, listMessages } from '../helpers/mailpit.js';
 
@@ -16,8 +16,8 @@ describe('reply e-mail notification', () => {
   beforeEach(async () => {
     await cleanDatabase();
     await clearMailbox();
-    await newReplyEmailQueue.obliterate({ force: true });
-    worker = startNewReplyEmailWorker();
+    await replyNotificationQueue.obliterate({ force: true });
+    worker = startReplyNotificationWorker();
   });
 
   afterEach(async () => {
@@ -28,13 +28,13 @@ describe('reply e-mail notification', () => {
 
   afterAll(async () => {
     await closeDatabase();
-    await newReplyEmailQueue.close();
+    await replyNotificationQueue.close();
     redisConnection.disconnect();
   });
 
   async function waitForQueueToSettle() {
     await vi.waitFor(async () => {
-      const counts = await newReplyEmailQueue.getJobCounts('waiting', 'active', 'delayed');
+      const counts = await replyNotificationQueue.getJobCounts('waiting', 'active', 'delayed');
       expect(counts.waiting + counts.active + counts.delayed).toBe(0);
     });
   }
@@ -97,7 +97,7 @@ describe('reply e-mail notification', () => {
     const response = await reply(post.id, bob.token, 'Nice post!');
 
     expect(response.status).toBe(201);
-    const jobs = await newReplyEmailQueue.getJobs(['waiting']);
+    const jobs = await replyNotificationQueue.getJobs(['waiting']);
     expect(jobs).toHaveLength(1);
     expect(jobs[0].data).toEqual({
       to: 'alice@example.com',
@@ -144,7 +144,7 @@ describe('reply e-mail notification', () => {
 
     // the first attempt failed and the job is waiting for its retry
     await vi.waitFor(async () => {
-      expect((await newReplyEmailQueue.getJobCounts('delayed')).delayed).toBe(1);
+      expect((await replyNotificationQueue.getJobCounts('delayed')).delayed).toBe(1);
     });
     expect(await listMessages()).toHaveLength(0);
   });

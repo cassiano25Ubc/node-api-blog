@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { toReplyResponseDto } from '../dtos/replies/reply-response.dto.js';
-import { BullmqNewReplyEmailJobsRepository } from '../repositories/bullmq-new-reply-email-jobs.repository.js';
+import { BullmqReplyNotificationJobsRepository } from '../repositories/bullmq-reply-notification-jobs.repository.js';
 import { DrizzleUsersRepository } from '../repositories/drizzle-users.repository.js';
 import { DrizzlePostsRepository } from '../repositories/drizzle-posts.repository.js';
 import { DrizzleRepliesRepository } from '../repositories/drizzle-replies.repository.js';
@@ -17,13 +17,13 @@ const postsRepository = new DrizzlePostsRepository();
 const repliesRepository = new DrizzleRepliesRepository();
 
 const usersRepository = new DrizzleUsersRepository();
-const emailJobs = new BullmqNewReplyEmailJobsRepository();
+const notificationJobs = new BullmqReplyNotificationJobsRepository();
 
 const createReply = new CreateReplyUseCase(
   postsRepository,
   repliesRepository,
   usersRepository,
-  emailJobs,
+  notificationJobs,
 );
 const deleteReply = new DeleteReplyUseCase(postsRepository, repliesRepository);
 
