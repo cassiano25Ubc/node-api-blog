@@ -1,7 +1,8 @@
 import { Queue } from 'bullmq';
 import { redisConnection } from '../connection.js';
 
-export const REPLY_NOTIFICATION_QUEUE_NAME = 'reply-notification';
+export const REPLY_NOTIFICATION_QUEUE_NAME =
+  process.env.NODE_ENV === 'test' ? 'reply-notification-test' : 'reply-notification';
 export const REPLY_NOTIFICATION_JOB_NAME = 'sendReplyNotification';
 
 
