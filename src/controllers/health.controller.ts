@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
+import { pingsQueue } from '../queues/pings/queue.js';
 
-export function healthController(_req: Request, res: Response): void {
+export async function healthController(_req: Request, res: Response) {
+  await pingsQueue.add('pingItem', {at: new Date().toISOString() })
   res.status(200).json({ status: 'ok' });
 }
