@@ -57,6 +57,17 @@ services:
       timeout: 5s
       retries: 5
 
+  bullboard:
+    image: node:22-alpine
+    container_name: node-api-blog-bullboard
+    restart: unless-stopped
+    command: npx -y @bull-board/cli -r redis://redis:6379 -p 3000 --host 0.0.0.0
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:${BULLBOARD_PORT:-3001}:3000'
+
 volumes:
   pgdata:
   pgdata_test:
