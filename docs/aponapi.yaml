@@ -1,0 +1,691 @@
+openapi: 3.1.0
+info:
+  title: Node API Blog
+  version: 1.0.0
+  description: |
+    Especificação OpenAPI da API REST de blog. A autenticação usa um token de
+    sessão no formato Bearer. Posts podem ser consultados publicamente; ações
+    de escrita exigem autenticação.
+servers:
+  - url: http://localhost:3000
+    description: Servidor local
+tags:
+  - name: Health
+  - name: Auth
+  - name: Me
+  - name: Posts
+  - name: Likes
+  - name: Replies
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Verifica a disponibilidade da API
+      responses:
+        '200':
+          description: API disponível
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Cadastra um usuário
+      description: Cria a conta e retorna um token de sessão; o usuário já fica autenticado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuário cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Autentica um usuário
+      description: Em caso de sucesso, gera um novo token de sessão e substitui o anterior.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Autenticação realizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me:
+    get:
+      tags: [Me]
+      summary: Consulta o perfil do usuário autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil do usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/me/avatar:
+    put:
+      tags: [Me]
+      summary: Atualiza o avatar do usuário autenticado
+      description: |
+        Envie uma imagem JPEG, PNG ou WebP válida, de até 5 MiB, no campo
+        `image`. A imagem é recortada para 200×200 pixels e convertida para WebP.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Arquivo JPEG, PNG ou WebP com tamanho máximo de 5 MiB.
+            encoding:
+              image:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        '200':
+          description: Avatar atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/posts:
+    get:
+      tags: [Posts]
+      summary: Lista posts
+      description: |
+        Retorna posts em ordem de criação decrescente. Cada post inclui todas
+        as replies em ordem crescente de criação; a paginação se aplica somente
+        aos posts. `limit` é fixo em 10.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Página solicitada (padrão 1).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Página de posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Posts]
+      summary: Cria um post
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequest'
+      responses:
+        '201':
+          description: Post criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/posts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    get:
+      tags: [Posts]
+      summary: Consulta um post
+      description: Autenticação opcional; `likedByMe` é `false` sem sessão válida.
+      security:
+        - BearerAuth: []
+        - {}
+      responses:
+        '200':
+          description: Post encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [Posts]
+      summary: Atualiza parcialmente um post próprio
+      description: Envie pelo menos um entre `title` e `content`; campos adicionais são rejeitados.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePostRequest'
+      responses:
+        '200':
+          description: Post atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Posts]
+      summary: Exclui um post próprio
+      description: Exclusão definitiva; likes e replies relacionados também são removidos.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Post excluído; corpo vazio.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/posts/{id}/image:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    put:
+      tags: [Posts]
+      summary: Atualiza a imagem de um post próprio
+      description: |
+        Envie uma imagem JPEG, PNG ou WebP válida, de até 5 MiB, no campo
+        `image`. A imagem mantém a proporção, é limitada a 1280×720 pixels e
+        convertida para WebP.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Arquivo JPEG, PNG ou WebP com tamanho máximo de 5 MiB.
+            encoding:
+              image:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        '200':
+          description: Imagem atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/posts/{id}/likes:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    post:
+      tags: [Likes]
+      summary: Curte um post
+      description: A operação é idempotente e não possui body.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Like registrado ou já existente; corpo vazio.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Likes]
+      summary: Remove o like de um post
+      description: A operação é idempotente e não possui body.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Like removido ou já inexistente; corpo vazio.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/posts/{id}/replies:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    post:
+      tags: [Replies]
+      summary: Cria uma reply em um post
+      description: |
+        Cria uma reply no post e enfileira uma notificação por e-mail para o
+        autor do post, exceto quando ele próprio responde. Falhas de notificação
+        não alteram a resposta HTTP.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReplyRequest'
+      responses:
+        '201':
+          description: Reply criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reply'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/posts/{id}/replies/{replyId}:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+      - name: replyId
+        in: path
+        required: true
+        description: Identificador inteiro positivo da reply.
+        schema:
+          type: integer
+          minimum: 1
+    delete:
+      tags: [Replies]
+      summary: Exclui uma reply própria
+      description: A reply deve pertencer ao post informado e ao usuário autenticado.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Reply excluída; corpo vazio.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Session token (64 hexadecimal characters)
+  parameters:
+    PostId:
+      name: id
+      in: path
+      required: true
+      description: Identificador inteiro positivo do post.
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    BadRequest:
+      description: Dados de entrada inválidos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Token ausente ou inválido, ou credenciais inválidas.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Invalid email or password
+    Forbidden:
+      description: Usuário autenticado sem permissão para a operação.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Recurso não encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Conflito com um recurso existente, como e-mail já cadastrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: CONFLICT
+              message: Email already registered
+    InternalError:
+      description: Erro inesperado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Nome; espaços no início e no fim são removidos.
+        email:
+          type: string
+          format: email
+          description: E-mail normalizado para lowercase.
+        password:
+          type: string
+          minLength: 6
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: E-mail normalizado para lowercase.
+        password:
+          type: string
+          minLength: 6
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: Token de sessão hexadecimal com 32 bytes.
+        user:
+          $ref: '#/components/schemas/UserProfile'
+    UserProfile:
+      type: object
+      required: [id, name, email, avatarUrl]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+    Author:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+    Reply:
+      type: object
+      required: [id, content, createdAt, author]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        author:
+          $ref: '#/components/schemas/Author'
+    Post:
+      type: object
+      required: [id, title, content, createdAt, imageUrl, author]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        imageUrl:
+          type: [string, 'null']
+          format: uri
+        author:
+          $ref: '#/components/schemas/Author'
+    PostListItem:
+      allOf:
+        - $ref: '#/components/schemas/Post'
+        - type: object
+          required: [likesCount, replies]
+          properties:
+            likesCount:
+              type: integer
+              minimum: 0
+            replies:
+              type: array
+              items:
+                $ref: '#/components/schemas/Reply'
+    PostDetail:
+      allOf:
+        - $ref: '#/components/schemas/Post'
+        - type: object
+          required: [likesCount, likedByMe, replies]
+          properties:
+            likesCount:
+              type: integer
+              minimum: 0
+            likedByMe:
+              type: boolean
+            replies:
+              type: array
+              items:
+                $ref: '#/components/schemas/Reply'
+    PostList:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostListItem'
+        meta:
+          type: object
+          required: [page, limit, total, totalPages]
+          properties:
+            page:
+              type: integer
+              minimum: 1
+            limit:
+              type: integer
+              const: 10
+            total:
+              type: integer
+              minimum: 0
+            totalPages:
+              type: integer
+              minimum: 0
+    CreatePostRequest:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Espaços no início e no fim são removidos.
+        content:
+          type: string
+          minLength: 1
+          description: Espaços no início e no fim são removidos.
+    UpdatePostRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Espaços no início e no fim são removidos.
+        content:
+          type: string
+          minLength: 1
+          description: Espaços no início e no fim são removidos.
+    CreateReplyRequest:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: Espaços no início e no fim são removidos.
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              description: Incluído quando há detalhes adicionais, como erros de validação.
+              items:
+                $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      type: object
+      required: [path, message]
+      properties:
+        path:
+          type: string
+        message:
+          type: string
